@@ -8,9 +8,9 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-func TestProducer(t *testing.T){
+func TestProducer(t *testing.T) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-        "bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": "localhost:9092",
 		"group.id":          "userInteractionDataGroup",
 		"auto.offset.reset": "earliest",
 	})
@@ -19,11 +19,11 @@ func TestProducer(t *testing.T){
 		panic(err)
 	}
 
-    if err := c.SubscribeTopics([]string{"userInteractionData"}, nil); err != nil{
-        fmt.Println(err)
-        t.Fail()
-    }
-    
+	if err := c.SubscribeTopics([]string{"user-interaction-data"}, nil); err != nil {
+		fmt.Println(err)
+		t.Fail()
+	}
+
 	// A signal handler or similar could be used to set this to false to break the loop.
 	run := true
 	for run {
@@ -38,6 +38,4 @@ func TestProducer(t *testing.T){
 		}
 	}
 	c.Close()
-}   
-
-
+}

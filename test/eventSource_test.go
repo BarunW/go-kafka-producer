@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func TestGenerateData(t *testing.T){
-    u, err := es.NewUserInteractionData()
-    if err != nil{
-        t.Fail()
-    }
-    fmt.Println(u)
+func TestGenerateData(t *testing.T) {
+	u, err := es.NewUserInteractionData()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Println(u)
 }
