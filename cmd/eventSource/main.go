@@ -18,7 +18,7 @@ func NewUserInteractionData() (*models.UserInteractionData, error) {
 	if err != nil {
 		return nil, err
 	}
-	u.TimStamp = time.Now().Format(time.RFC3339)
+	u.TimeStamp = time.Now().Format(time.RFC3339)
 	return &u, nil
 }
 
