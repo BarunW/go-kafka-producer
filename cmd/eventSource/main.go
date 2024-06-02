@@ -53,7 +53,7 @@ func productId(v reflect.Value) (interface{}, error) {
 }
 
 func sessionDuration(v reflect.Value) (interface{}, error) {
-	return strconv.Itoa(rand.Intn(700)), nil
+	return rand.Intn(700), nil
 }
 
 func generateData(u *models.UserInteractionData) error {

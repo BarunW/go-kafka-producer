@@ -36,7 +36,7 @@ func writeMsg(topic string, data models.UserInteractionData, p *kafka.Producer) 
 func PushUserInteractionData(topic string, ctx context.Context, p *kafka.Producer) {
 	eventChan := make(chan models.UserInteractionData, 8)
 	go mockevents.GenerateEvents(ctx, eventChan)
-outer:
+    outer:
 	for {
 		select {
 		case data := <-eventChan:

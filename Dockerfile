@@ -1,39 +1,42 @@
-# Go base image
-FROM golang:alpine as builder
+# Builder stage
+FROM golang:1.22-bookworm AS builder
 
-# Make a dir app
-RUN mkdir /app
-
-# Add the working dir to the container
-ADD . /app
-
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# to clean any cache
-RUN go clean --modcache
-
-# download all required dependencies 
+# Copy module files and download dependencies
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Build the Go application using cgo enabled and ldflags[ this will provide additional information to Go linker]
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo  -ldflags="-extldflags=-static" -o source .
+# Install build dependencies 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    librdkafka-dev 
 
+# Install the Confluent Kafka Go client library (confluent-kafka-go)
+RUN go get github.com/confluentinc/confluent-kafka-go/kafka
 
-# Copy your Go source code to the container
-FROM alpine:latest AS certificates
-RUN apk --no-cache add ca-certificates
+# Copy the application code
+COPY . .
 
-#- 
-FROM scratch
-COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-crtificates.crt
-COPY --from=builder /app/source .
+# Build the Go binary with CGO enabled
+RUN CGO_ENABLED=1 go build -o producer
 
-# Configure go
-ENV GOROOT /usr/lib/go
-ENV GOPATH /go
-ENV PATH /go/bin:$PATH
+# Final stage (for a smaller production image)
+FROM debian:bookworm-slim
 
-EXPOSE 8085
-CMD ["./source"]
+# Set the working directory in the final image
+WORKDIR /app
+
+# Copy the binary from the builder stage
+COPY --from=builder /app/producer .
+
+# Copy librdkafka from the builder stage
+COPY --from=builder /usr/lib/x86_64-linux-gnu/librdkafka.so.1 /usr/lib/x86_64-linux-gnu/
+
+# Expose the port your application uses (if applicable)
+EXPOSE 8080
+
+# Command to run the application
+CMD ["./producer"]
 
