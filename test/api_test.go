@@ -2,42 +2,42 @@ package test
 
 import (
 	"fmt"
-	"source/cmd/api"
 	"testing"
+	"time"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-func TestKafkaConnection(t *testing.T){
-    p := api.NewProducers()
-    NewTopicTest(t, p.Conn, p.NewTopic)
-    t.Cleanup(func() {
-        p.Conn.Close()
-    }) 
-}
+func TestProducer(t *testing.T){
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+        "bootstrap.servers": "localhost:9092",
+		"group.id":          "userInteractionDataGroup",
+		"auto.offset.reset": "earliest",
+	})
 
-func NewTopicTest(t *testing.T, conn *kafka.Conn, i interface{}){
-    f, ok:= i.(func(config []kafka.TopicConfig) error) 
-    if !ok { t.Fail() }
+	if err != nil {
+		panic(err)
+	}
 
-    topic := "testTopic"
-    topicConfigs := []kafka.TopicConfig{
-        {
-            Topic:             topic,
-            NumPartitions:     1,
-            ReplicationFactor: 1,
-        },
-    }
-    if err := f(topicConfigs); err != nil{
-        t.Fail()
-    }
-
-    // Delete the testTopic
-    err := conn.DeleteTopics(topic)
-    if err != nil{
+    if err := c.SubscribeTopics([]string{"userInteractionData"}, nil); err != nil{
         fmt.Println(err)
         t.Fail()
-    } 
-}
+    }
+    
+	// A signal handler or similar could be used to set this to false to break the loop.
+	run := true
+	for run {
+		msg, err := c.ReadMessage(time.Second)
+		if err == nil {
+			fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+		} else if !err.(kafka.Error).IsTimeout() {
+			// The client will automatically try to recover from all errors.
+			// Timeout is not considered an error because it is raised by
+			// ReadMessage in absence of messages.
+			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
+		}
+	}
+	c.Close()
+}   
 
 

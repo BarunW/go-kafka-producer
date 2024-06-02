@@ -1,55 +1,41 @@
 package api
 
 import (
-    "bytes"
-    "context"
-    "encoding/gob"
-    "log/slog"
-    es "source/cmd/eventSource"
-    mockevents "source/cmd/mockEvents"
-    "time"
+	"context"
+	"encoding/json"
+	"log/slog"
+	es "source/cmd/eventSource"
+	mockevents "source/cmd/mockEvents"
 
-    "github.com/segmentio/kafka-go"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-func encode(data es.UserInteractionData) ([]byte, error){
-    buffer := bytes.Buffer{}
-    e := gob.NewEncoder(&buffer)
-
-    if err := e.Encode(data); err != nil{
+func encode(data es.UserInteractionData) ([]byte, error){ 
+    dataByt, err := json.Marshal(data)
+    if err != nil{
        return nil, err 
     }
 
-    return buffer.Bytes(), nil
+    return dataByt ,nil
 }
 
-
-func writeMsg(topic string, data es.UserInteractionData, pd *producers) error {       
-    writer := &kafka.Writer{
-       Addr: pd.Conn.RemoteAddr(),
-       Topic: topic,
-       MaxAttempts: 2,
-       WriteTimeout: 10 * time.Second,
-    }
-    databByt, err := encode(data)   
-    if err != nil{ 
-        slog.Error("Unable to encode the user interaction data", "Deatails", err.Error())
-        return err
+func writeMsg(topic string, data es.UserInteractionData, p *kafka.Producer) error {       
+	// Produce messages to topic (asynchronously)
+    datByt, err := encode(data)     
+    if err != nil{
+       return err 
     }
 
-    err = writer.WriteMessages(
-        context.Background(),
-        kafka.Message{
-            Value: databByt,
-        },
-    )
-    if err != nil{ return err }
-    slog.Info("Successfully Written the message")
+    p.Produce(&kafka.Message{
+        TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+        Value:          datByt,
+    }, nil)
+	
     return nil
 }
     
 
-func PushUserInteractionData(topic string, ctx context.Context, p *producers){
+func PushUserInteractionData(topic string, ctx context.Context, p *kafka.Producer){
     eventChan := make(chan es.UserInteractionData, 8) 
     go mockevents.GenerateEvents(ctx, eventChan) 
     outer:

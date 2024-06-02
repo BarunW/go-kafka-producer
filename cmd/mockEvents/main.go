@@ -13,6 +13,7 @@ func GenerateEvents(ctx context.Context, eventChan chan<-eventSource.UserInterac
     ticker := time.NewTicker(13 * time.Millisecond) 
     var resetTicker = func() { 
         t := rand.Intn(60)
+        if t < 0 { t = 7 }
         ticker.Reset(time.Duration(t) * time.Second) 
         fmt.Printf("\n------Next event in %d second-----\n", t)
     }

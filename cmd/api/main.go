@@ -1,54 +1,57 @@
 package api
 
 import (
-	"log/slog"
-	"net"
-	"strconv"
+	"fmt"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-type producers struct{
-    Conn *kafka.Conn
+type producerApi struct{
+    Producer *kafka.Producer
 }
 
-func NewProducers() *producers{
-    conn := initKafkaConn() 
-    pr := &producers{
-       Conn: conn,
-    }
-    return pr
+func NewProducersApi() *producerApi{ 
+   p, err := kafka.NewProducer(&kafka.ConfigMap{
+       "bootstrap.servers": "localhost:9092",
+//        "sasl.username":     "<CLUSTER API KEY>",
+//        "sasl.password":     "<CLUSTER API SECRET>",
+//
+//        // Fixed properties
+//        "security.protocol": "SASL_SSL",
+//        "sasl.mechanisms":   "PLAIN",
+//        "acks":              "all"}
+   })
+	if err != nil {
+		panic(err)
+	}
+    pa := &producerApi{
+        Producer: p,
+    } 
+    pa.msgReportHandler() 
+	return pa
 }
 
-func initKafkaConn() *kafka.Conn{
-    conn, err := kafka.Dial("tcp", "localhost:9092")
-    if err != nil {
-        panic(err.Error())
-    }
-    // connection close should be handle by the caller    
-    return conn
+func(pa *producerApi) msgReportHandler(){    
+	// Delivery report handler for produced messages
+	go func() {
+		for e := range pa.Producer.Events() {
+			switch ev := e.(type) {
+			case *kafka.Message:
+				if ev.TopicPartition.Error != nil {
+					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+				} else {
+					fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+				}
+			}
+		}
+	}()
 }
 
-func(p *producers) NewTopic(topicConfigs []kafka.TopicConfig) error{
-    // to create topics when auto.create.topics.enable='false'
-    controller, err := p.Conn.Controller()
-    if err != nil {
-        slog.Error(err.Error())
-        return err
-    }
-    var controllerConn *kafka.Conn
-    controllerConn, err = kafka.Dial("tcp", net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port)))
-    if err != nil {
-        slog.Error(err.Error())
-        return err
-    }
-    defer controllerConn.Close()
-
-    err = controllerConn.CreateTopics(topicConfigs...)
-    if err != nil {
-        slog.Error(err.Error())
-        return err
-    }
-    return nil
+func(pa *producerApi) Close(){
+	// Wait for message deliveries before shutting down
+	pa.Producer.Flush(15 * 1000) 
+    pa.Producer.Close()
 }
+
+
 
